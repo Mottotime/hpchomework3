@@ -64,7 +64,7 @@ do n=1,steps
     call MPI_SENDRECV(a(1,bsize+1),tsize,MPI_REAL,right,tag1,&
 			a(1,1),tsize,MPI_REAL,left,tag1,&
 			MPI_COMM_WORLD,status,ierr)
-    call MPI_SENDRECV(a(1,2),tsize,MPI_REAL,right,tag2,&
+    call MPI_SENDRECV(a(1,2),tsize,MPI_REAL,left,tag2,&
 			a(1,bsize+2),tsize,MPI_REAL,right,tag2,&
 			MPI_COMM_WORLD,status,ierr)
     begin_col=2
