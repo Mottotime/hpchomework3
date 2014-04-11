@@ -21,6 +21,7 @@ real,allocatable:: a(:,:),b(:,:),temp1(:),temp2(:)
 integer begin_col,end_col,begin_row,end_row,ierr
 integer status(MPI_STATUS_SIZE)
 integer left,right,tag1,tag2,up,down,tag3,tag4
+integer isend1,isend2,irecv1,irecv2,istat1,istat2,istat3,istat4
 tag1=3
 tag2=4
 tag3=5
@@ -124,18 +125,43 @@ call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 time1=MPI_WTIME()
 
 do n=0,steps
-    call MPI_SENDRECV(a(2,bsize+1),bsize,MPI_REAL,right,tag1,&
-			a(2,1),bsize,MPI_REAL,left,tag1,&
-			MPI_COMM_WORLD,status,ierr)
-    call MPI_SENDRECV(a(2,2),bsize,MPI_REAL,left,tag2,&
-			a(2,bsize+2),bsize,MPI_REAL,right,tag2,&
-			MPI_COMM_WORLD,status,ierr)
+!    call MPI_SENDRECV(a(2,bsize+1),bsize,MPI_REAL,right,tag1,&
+!			a(2,1),bsize,MPI_REAL,left,tag1,&
+!			MPI_COMM_WORLD,status,ierr)
+    if(bj>0)then
+	call MPI_RECV(a(2,1),bsize,MPI_REAL,left,tag1,&
+		    MPI_COMM_WORLD,status,ierr)
+    end if
+    if(bj<nb-1)then
+	call MPI_SEND(a(2,bsize+1),bsize,MPI_REAL,right,tag1,&
+			MPI_COMM_WORLD,ierr)
+    end if
+!    call MPI_SENDRECV(a(2,2),bsize,MPI_REAL,left,tag2,&
+!			a(2,bsize+2),bsize,MPI_REAL,right,tag2,&
+!			MPI_COMM_WORLD,status,ierr)
+    if(bj<nb-1)then
+	call MPI_RECV(a(2,bsize+2),bsize,MPI_REAL,right,tag2,&
+		    MPI_COMM_WORLD,status,ierr)
+    end if
+    if(bj>0)then
+	call MPI_SEND(a(2,2),bsize,MPI_REAL,left,tag2,&
+			MPI_COMM_WORLD,ierr)
+    end if
     do i=1,bsize
 	temp1(i)=a(2,i+1)
     end do
-    call MPI_SENDRECV(temp1,bsize,MPI_REAL,up,tag3,&
-			temp2,bsize,MPI_REAL,down,tag3,&
-			MPI_COMM_WORLD,status,ierr)
+!    call MPI_SENDRECV(temp1,bsize,MPI_REAL,up,tag3,&
+!			temp2,bsize,MPI_REAL,down,tag3,&
+!			MPI_COMM_WORLD,status,ierr)
+    
+    if(bi<nb-1)then
+	call MPI_RECV(temp2,bsize,MPI_REAL,down,tag3,&
+		    MPI_COMM_WORLD,status,ierr)
+    end if
+    if(bi>0)then
+	call MPI_SEND(temp1,bsize,MPI_REAL,up,tag3,&
+			MPI_COMM_WORLD,ierr)
+    end if
     do i=1,bsize
 	a(bsize+2,i+1)=temp2(i)
     end do
@@ -143,12 +169,22 @@ do n=0,steps
     do i=1,bsize
 	temp1(i)=a(bsize+1,i+1)
     end do
-    call MPI_SENDRECV(temp1,bsize,MPI_REAL,down,tag4,&
-			temp2,bsize,MPI_REAL,up,tag4,&
-			MPI_COMM_WORLD,status,ierr)
+!    call MPI_SENDRECV(temp1,bsize,MPI_REAL,down,tag4,&
+!			temp2,bsize,MPI_REAL,up,tag4,&
+!			MPI_COMM_WORLD,status,ierr)
+    if(bi>0)then
+	call MPI_RECV(temp2,bsize,MPI_REAL,up,tag4,&
+		    MPI_COMM_WORLD,status,ierr)
+    end if
+    if(bi<nb-1)then
+	call MPI_SEND(temp1,bsize,MPI_REAL,down,tag4,&
+			MPI_COMM_WORLD,ierr)
+    end if
     do i=1,bsize
 	a(1,i+1)=temp2(i)
     end do
+!
+
 
     begin_col=2
     end_col=bsize+1
