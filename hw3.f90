@@ -23,6 +23,7 @@ call MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
 call MPI_GET_PROCESSOR_NAME(myname,namelen,ierr)
 
 print *, "I am proc (",myid,"), named (",myname,"), in",nproc,"processors."
+call flush(6)
 
 if (myid>0)then
     left=myid-1
