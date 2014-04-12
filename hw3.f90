@@ -59,7 +59,7 @@ subroutine time_jacobi(comm_type,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,
 
     time2=MPI_WTIME()
     time=time2-time1
-    call MPI_REDUCE(time,gtime,1,MPI_REAL,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+    call MPI_REDUCE(time,gtime,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD,ierr)
     if(myid==0)then
         print *,gtime,'is the running time of comm type = ',comm_type
    end if
@@ -134,20 +134,51 @@ subroutine nonblock_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,
         end do
 
 !	call MPI_WAITALL(4,req(5),stat(5,1),ierr)
-	call MPI_WAITALL(8,req,stat,ierr)
 
         !calculation
-        do j=begin_col,end_col
-            do i=begin_row,end_row
+        do j=begin_col+1,end_col-1
+            do i=begin_row+1,end_row-1
                 b(i,j)=(a(i,j+1)+a(i,j-1)+a(i+1,j)+a(i-1,j))*0.25
             end do
         end do
 
-        do j=begin_col,end_col
-            do i=begin_row,end_row
+        do j=begin_col+2,end_col-2
+            do i=begin_row+2,end_row-2
                 a(i,j)=b(i,j)
             end do
         end do
+
+	call MPI_WAITALL(8,req,stat,ierr)
+
+	do i=begin_row,end_row
+	    b(i,begin_col)=(a(i,begin_col-1)+a(i,begin_col+1)+a(i+1,begin_col)+a(i-1,begin_col))*0.25
+	end do
+	do i=begin_row,end_row
+	    b(i,end_col)=(a(i,end_col-1)+a(i,end_col+1)+a(i+1,end_col)+a(i-1,end_col))*0.25
+	end do
+	do j=begin_col,end_col
+	    b(begin_row,j)=(a(begin_row,j-1)+a(begin_row,j+1)+a(begin_row+1,j)+a(begin_row-1,j))*0.25
+	end do
+	do j=begin_col,end_col
+	    b(end_row,j)=(a(end_row,j-1)+a(end_row,j+1)+a(end_row+1,j)+a(end_row-1,j))*0.25
+	end do
+
+	do i=begin_row,end_row
+	    do j=begin_col,begin_col+1
+		a(i,j)=b(i,j)
+	    end do
+	end do
+	do i=begin_row,end_row
+	    do j=end_col,end_col-1
+		a(i,j)=b(i,j)
+	    end do
+	end do
+	do j=begin_col+2,end_col-2
+	    a(begin_row,j)=b(begin_row,j)
+	    a(begin_row+1,j)=b(begin_row+1,j)
+	    a(end_row-1,j)=b(end_row-1,j)
+	    a(end_row,j)=b(end_row,j)
+	end do
     end do
 end ! subroutine nonblock_jacobi
 
