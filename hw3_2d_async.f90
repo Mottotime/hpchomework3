@@ -138,7 +138,7 @@ do n=0,steps
 	call MPI_WAIT(irecv,status,ierr)
     end if
     if(bj<nb-1)then
-	call MPI_iSEND(a(2,bsize+1),bsize,MPI_REAL,right,tag1,&
+	call MPI_ISEND(a(2,bsize+1),bsize,MPI_REAL,right,tag1,&
 			MPI_COMM_WORLD,isend,ierr)
 	call MPI_WAIT(isend,status,ierr)
     end if
