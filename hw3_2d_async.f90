@@ -13,27 +13,34 @@ integer left,right,up,down
 real*8 time1,time2,time,gtime
 
 call start_mpi(myid,nproc,tsize,nb,steps,ierr,bsize)
-
+print *,myid,"1"
 call ab_allocation(a,b,bsize,ierr)
-if (ierr/=0) then 
+if (ierr/=0) then
+    print *,"Unable to allocate."
     stop 
 end if
+print *,myid,"2"
 
 bi=myid/nb
 bj=MOD(myid,nb)
 
 call block_neighbour(bi,bj,myid,left,right,up,down,nb)
+print *,myid,"3"
 
 call block_value(bsize,a,bi,bj,nb)
+print *,myid,"4"
 
 call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 time1=MPI_WTIME()
+print *,myid,"5"
 
 call nonblock_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
 
+print *,myid,"6"
 time2=MPI_WTIME()
 time=time2-time1
 call MPI_REDUCE(time,gtime,1,MPI_REAL,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+print *,myid,"8"
 if(myid==0)then
     print *,gtime,'is the running time.'
 end if
@@ -67,6 +74,7 @@ subroutine start_mpi(myid,nproc,tsize,nb,steps,ierr,bsize)
     call MPI_BCAST(nb,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
     call MPI_BCAST(steps,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
 
+    print *,myid,"11"
     if (nb>0) then
         bsize=tsize/nb
     else
@@ -78,8 +86,9 @@ subroutine start_mpi(myid,nproc,tsize,nb,steps,ierr,bsize)
         print *,'Proc num /= num of block ^2'
     end if
 
-    !print *, "I am proc (",myid,"), named (",myname,"), in",nproc,"processors."
-    !call flush(6)
+    print *, "I am proc (",myid,"), named (",myname,"), in",nproc,"processors."
+    call flush(6)
+    return
 end !subroutine start_mpi
 
 subroutine ab_allocation(a,b,bsize,ierr)
@@ -113,7 +122,7 @@ end !subroutine ab_allocation
 subroutine block_neighbour(bi,bj,myid,left,right,up,down,nb)
     implicit none
     include 'mpif.h'
-    integer:: bi,bj,myid,left,right,up,down
+    integer:: bi,bj,myid,left,right,up,down,nb
 
     if (bj>0)then
     left=myid-1
