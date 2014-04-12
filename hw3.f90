@@ -26,9 +26,9 @@ bi=myid/nb
 bj=MOD(myid,nb)
 call block_neighbour(bi,bj,myid,left,right,up,down,nb)
 
-call time_jacobi(1,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
-call time_jacobi(2,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
-call time_jacobi(3,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
+call time_jacobi(1,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,myid,ierr)
+call time_jacobi(2,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,myid,ierr)
+call time_jacobi(3,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,myid,ierr)
 
 print *,myid,'Exit!'
 call MPI_Finalize(rc)
@@ -37,11 +37,11 @@ end program !main
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-subroutine time_jacobi(type,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
+subroutine time_jacobi(comm_type,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,myid,ierr)
     implicit none
     include 'mpif.h'
 
-    integer:: type,bi,bj,left,right,up,down,bsize,steps,nb,ierr
+    integer:: comm_type,bi,bj,left,right,up,down,bsize,steps,nb,ierr,myid
     real:: a(bsize+2,bsize+2),b(bsize+2,bsize+2),temp1(bsize),temp2(bsize)
     real*8 time1,time2,time,gtime
 
@@ -49,9 +49,9 @@ subroutine time_jacobi(type,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps
     call MPI_BARRIER(MPI_COMM_WORLD,ierr)
     time1=MPI_WTIME()
     
-    if(type==1)then
+    if(comm_type==1)then
         call block_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
-    elseif(type==2)then
+    elseif(comm_type==2)then
         call sr_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
     else
         call nonblock_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
@@ -61,8 +61,9 @@ subroutine time_jacobi(type,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps
     time=time2-time1
     call MPI_REDUCE(time,gtime,1,MPI_REAL,MPI_MAX,0,MPI_COMM_WORLD,ierr)
     if(myid==0)then
-        print *,gtime,'is the running time of type = ',type
-   end if    
+        print *,gtime,'is the running time of comm type = ',comm_type
+   end if
+   call flush(6)
 end !subroutine time_jacobi
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -76,65 +77,62 @@ subroutine nonblock_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,
 
     integer:: begin_col,end_col,begin_row,end_row
     integer n,i,j
-    integer isend,irecv
+    integer req(8)
     integer status(MPI_STATUS_SIZE),status1(MPI_STATUS_SIZE),status2(MPI_STATUS_SIZE)
     integer::tag1=3,tag2=4,tag3=5,tag4=6
+
+    real:: temp3(bsize),temp4(bsize)
 
     call begin_end(begin_col,begin_row,end_col,end_row,bsize,nb,bi,bj)
 
     do n=0,steps
         !send data to right
-        if(bj>0)then
+
+	do i=1,8
+	    req(i)=MPI_REQUEST_NULL
+	end do
+
         call MPI_IRECV(a(2,1),bsize,MPI_REAL,left,tag1,&
-                MPI_COMM_WORLD,irecv,ierr)
-        call MPI_WAIT(irecv,status,ierr)
-        end if
-        if(bj<nb-1)then
+                MPI_COMM_WORLD,req(1),ierr)
+        !call MPI_WAIT(req(1),status,ierr)
         call MPI_ISEND(a(2,bsize+1),bsize,MPI_REAL,right,tag1,&
-                MPI_COMM_WORLD,isend,ierr)
-        call MPI_WAIT(isend,status,ierr)
-        end if
+                MPI_COMM_WORLD,req(2),ierr)
+        !call MPI_WAIT(req(2),status,ierr)
+	!call MPI_WAITALL(2,req,status,ierr)
+
         !send data to left
-        if(bj<nb-1)then
-        call MPI_RECV(a(2,bsize+2),bsize,MPI_REAL,right,tag2,&
-                MPI_COMM_WORLD,status,ierr)
-        end if
-        if(bj>0)then
-        call MPI_SEND(a(2,2),bsize,MPI_REAL,left,tag2,&
-                MPI_COMM_WORLD,ierr)
-        end if
+        call MPI_IRECV(a(2,bsize+2),bsize,MPI_REAL,right,tag2,&
+                MPI_COMM_WORLD,req(3),ierr)
+        call MPI_ISEND(a(2,2),bsize,MPI_REAL,left,tag2,&
+                MPI_COMM_WORLD,req(4),ierr)
+
+	!call MPI_WAITALL(4,req,status,ierr)
+        !send data up
         do i=1,bsize
             temp1(i)=a(2,i+1)
         end do
-
-        !send data up
-        if(bi<nb-1)then
-        call MPI_RECV(temp2,bsize,MPI_REAL,down,tag3,&
-                MPI_COMM_WORLD,status,ierr)
-        end if
-        if(bi>0)then
-        call MPI_SEND(temp1,bsize,MPI_REAL,up,tag3,&
-                MPI_COMM_WORLD,ierr)
-        end if
+        call MPI_IRECV(temp2,bsize,MPI_REAL,down,tag3,&
+                MPI_COMM_WORLD,req(5),ierr)
+        call MPI_ISEND(temp1,bsize,MPI_REAL,up,tag3,&
+                MPI_COMM_WORLD,req(6),ierr)
         do i=1,bsize
             a(bsize+2,i+1)=temp2(i)
         end do
 
         !send data down
         do i=1,bsize
-            temp1(i)=a(bsize+1,i+1)
+            temp3(i)=a(bsize+1,i+1)
         end do
-        if(bi>0)then
-        call MPI_RECV(temp2,bsize,MPI_REAL,up,tag4,&
-                MPI_COMM_WORLD,status,ierr)
-        end if
-        if(bi<nb-1)then
-        call MPI_SEND(temp1,bsize,MPI_REAL,down,tag4,&
-                MPI_COMM_WORLD,ierr)
-        end if
+        call MPI_IRECV(temp4,bsize,MPI_REAL,up,tag4,&
+                MPI_COMM_WORLD,req(7),ierr)
+        call MPI_ISEND(temp3,bsize,MPI_REAL,down,tag4,&
+                MPI_COMM_WORLD,req(8),ierr)
         do i=1,bsize
-            a(1,i+1)=temp2(i)
+            a(1,i+1)=temp4(i)
         end do
+
+	!call MPI_WAITALL(4,req(5),status,ierr)
+	call MPI_WAITALL(8,req,status,ierr)
 
         !calculation
         do j=begin_col,end_col
@@ -169,36 +167,23 @@ subroutine block_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,
 
     do n=0,steps
         !send data to right
-        if(bj>0)then
         call MPI_RECV(a(2,1),bsize,MPI_REAL,left,tag1,&
                 MPI_COMM_WORLD,status,ierr)
-        end if
-        if(bj<nb-1)then
         call MPI_SEND(a(2,bsize+1),bsize,MPI_REAL,right,tag1,&
                 MPI_COMM_WORLD,ierr)
-        end if
-        !send data to left
-        if(bj<nb-1)then
+
         call MPI_RECV(a(2,bsize+2),bsize,MPI_REAL,right,tag2,&
                 MPI_COMM_WORLD,status,ierr)
-        end if
-        if(bj>0)then
         call MPI_SEND(a(2,2),bsize,MPI_REAL,left,tag2,&
                 MPI_COMM_WORLD,ierr)
-        end if
+
         do i=1,bsize
             temp1(i)=a(2,i+1)
         end do
-
-        !send data up
-        if(bi<nb-1)then
         call MPI_RECV(temp2,bsize,MPI_REAL,down,tag3,&
                 MPI_COMM_WORLD,status,ierr)
-        end if
-        if(bi>0)then
         call MPI_SEND(temp1,bsize,MPI_REAL,up,tag3,&
                 MPI_COMM_WORLD,ierr)
-        end if
         do i=1,bsize
             a(bsize+2,i+1)=temp2(i)
         end do
@@ -207,14 +192,10 @@ subroutine block_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,
         do i=1,bsize
             temp1(i)=a(bsize+1,i+1)
         end do
-        if(bi>0)then
         call MPI_RECV(temp2,bsize,MPI_REAL,up,tag4,&
                 MPI_COMM_WORLD,status,ierr)
-        end if
-        if(bi<nb-1)then
         call MPI_SEND(temp1,bsize,MPI_REAL,down,tag4,&
                 MPI_COMM_WORLD,ierr)
-        end if
         do i=1,bsize
             a(1,i+1)=temp2(i)
         end do
