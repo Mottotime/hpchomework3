@@ -1,5 +1,5 @@
 &para
 tsize = 10240,
-nb = 4,
-steps =100
+nb = 4,`
+steps =10
 /

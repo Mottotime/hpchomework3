@@ -29,6 +29,7 @@ call block_neighbour(bi,bj,myid,left,right,up,down,nb)
 call time_jacobi(1,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,myid,ierr)
 call time_jacobi(2,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,myid,ierr)
 call time_jacobi(3,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,myid,ierr)
+call time_jacobi(4,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,myid,ierr)
 
 print *,myid,'Exit!'
 call MPI_Finalize(rc)
@@ -53,8 +54,10 @@ subroutine time_jacobi(comm_type,bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,
         call block_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
     elseif(comm_type==2)then
         call sr_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
-    else
+    elseif(comm_type==3)then
         call nonblock_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
+    else
+        call nonblock_c_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
     end if
 
     time2=MPI_WTIME()
@@ -69,6 +72,92 @@ end !subroutine time_jacobi
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 subroutine nonblock_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
+    implicit none
+    include 'mpif.h'
+
+    integer:: bi,bj,left,right,up,down,bsize,steps,nb,ierr
+    real:: a(bsize+2,bsize+2),b(bsize+2,bsize+2),temp1(bsize),temp2(bsize)
+
+    integer:: begin_col,end_col,begin_row,end_row
+    integer n,i,j
+    integer req(8)
+    integer stat(MPI_STATUS_SIZE,8)
+    !integer status(MPI_STATUS_SIZE),status1(MPI_STATUS_SIZE),status2(MPI_STATUS_SIZE)
+    integer::tag1=3,tag2=4,tag3=5,tag4=6
+
+    real:: temp3(bsize),temp4(bsize)
+
+    call begin_end(begin_col,begin_row,end_col,end_row,bsize,nb,bi,bj)
+
+    do n=0,steps
+        !send data to right
+
+	do i=1,8
+	    req(i)=MPI_REQUEST_NULL
+	end do
+
+        call MPI_IRECV(a(2,1),bsize,MPI_REAL,left,tag1,&
+                MPI_COMM_WORLD,req(1),ierr)
+        !call MPI_WAIT(req(1),status,ierr)
+        call MPI_ISEND(a(2,bsize+1),bsize,MPI_REAL,right,tag1,&
+                MPI_COMM_WORLD,req(2),ierr)
+        !call MPI_WAIT(req(2),status,ierr)
+	!call MPI_WAITALL(2,req,status,ierr)
+
+        !send data to left
+        call MPI_IRECV(a(2,bsize+2),bsize,MPI_REAL,right,tag2,&
+                MPI_COMM_WORLD,req(3),ierr)
+        call MPI_ISEND(a(2,2),bsize,MPI_REAL,left,tag2,&
+                MPI_COMM_WORLD,req(4),ierr)
+
+        !send data up
+        do i=1,bsize
+            temp1(i)=a(2,i+1)
+        end do
+        call MPI_IRECV(temp2,bsize,MPI_REAL,down,tag3,&
+                MPI_COMM_WORLD,req(5),ierr)
+        call MPI_ISEND(temp1,bsize,MPI_REAL,up,tag3,&
+                MPI_COMM_WORLD,req(6),ierr)
+        do i=1,bsize
+            a(bsize+2,i+1)=temp2(i)
+        end do
+
+!	call MPI_WAITALL(4,req(1),stat(1,1),ierr)
+
+        !send data down
+        do i=1,bsize
+            temp3(i)=a(bsize+1,i+1)
+        end do
+        call MPI_IRECV(temp4,bsize,MPI_REAL,up,tag4,&
+                MPI_COMM_WORLD,req(7),ierr)
+        call MPI_ISEND(temp3,bsize,MPI_REAL,down,tag4,&
+                MPI_COMM_WORLD,req(8),ierr)
+        do i=1,bsize
+            a(1,i+1)=temp4(i)
+        end do
+
+!	call MPI_WAITALL(4,req(5),stat(5,1),ierr)
+	call MPI_WAITALL(8,req,stat,ierr)
+
+        !calculation
+        do j=begin_col,end_col
+            do i=begin_row,end_row
+                b(i,j)=(a(i,j+1)+a(i,j-1)+a(i+1,j)+a(i-1,j))*0.25
+            end do
+        end do
+
+        do j=begin_col,end_col
+            do i=begin_row,end_row
+                a(i,j)=b(i,j)
+            end do
+        end do
+
+
+    end do
+end ! subroutine nonblock_jacobi
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+subroutine nonblock_c_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
     implicit none
     include 'mpif.h'
 
