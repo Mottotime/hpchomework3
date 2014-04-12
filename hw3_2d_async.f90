@@ -14,6 +14,7 @@ real*8 time1,time2,time,gtime
 
 call start_mpi(myid,nproc,tsize,nb,steps,ierr,bsize)
 print *,myid,"1"
+call flush(6)
 
 allocate(a(bsize+2,bsize+2),stat=ierr)
 allocate(b(bsize+2,bsize+2),stat=ierr)
@@ -21,27 +22,33 @@ allocate(temp1(bsize))
 allocate(temp2(bsize))
 if (ierr/=0) then
     print *,"Unable to allocate."
+    call flush(6)
     stop 
 end if
 
 print *,myid,"2"
+call flush(6)
 
 bi=myid/nb
 bj=MOD(myid,nb)
 
 call block_neighbour(bi,bj,myid,left,right,up,down,nb)
 print *,myid,"3"
+call flush(6)
 
 call block_value(bsize,a,bi,bj,nb)
 print *,myid,"4"
+call flush(6)
 
 call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 time1=MPI_WTIME()
 print *,myid,"5"
+call flush(6)
 
 call nonblock_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
 
 print *,myid,"6"
+call flush(6)
 time2=MPI_WTIME()
 time=time2-time1
 call MPI_REDUCE(time,gtime,1,MPI_REAL,MPI_MAX,0,MPI_COMM_WORLD,ierr)
@@ -158,7 +165,7 @@ subroutine block_value(bsize,a,bi,bj,nb)
     implicit none
 
     integer::bsize,bi,bj,nb
-    real::a(:,:)
+    real::a(bsize+2,bsize+2)
 
     integer i,j
     do j=1,bsize+2
@@ -197,7 +204,7 @@ subroutine nonblock_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,
     include 'mpif.h'
 
     integer:: bi,bj,left,right,up,down,bsize,steps,nb,ierr
-    real:: a(:,:),b(:,:),temp1(:),temp2(:)
+    real:: a(bsize+2,bsize+2),b(bsize+2,bsize+2),temp1(bsize),temp2(bsize)
 
     integer begin_col,end_col,begin_row,end_row
     integer n,i,j
