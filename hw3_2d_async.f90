@@ -14,11 +14,16 @@ real*8 time1,time2,time,gtime
 
 call start_mpi(myid,nproc,tsize,nb,steps,ierr,bsize)
 print *,myid,"1"
-call ab_allocation(a,b,bsize,ierr)
+
+allocate(a(bsize+2,bsize+2),stat=ierr)
+allocate(b(bsize+2,bsize+2),stat=ierr)
+allocate(temp1(bsize))
+allocate(temp2(bsize))
 if (ierr/=0) then
     print *,"Unable to allocate."
     stop 
 end if
+
 print *,myid,"2"
 
 bi=myid/nb
@@ -91,33 +96,33 @@ subroutine start_mpi(myid,nproc,tsize,nb,steps,ierr,bsize)
     return
 end !subroutine start_mpi
 
-subroutine ab_allocation(a,b,bsize,ierr)
-    implicit none
-
-    integer:: bsize,ierr
-    real,allocatable:: a(:,:),b(:,:),temp1(:),temp2(:)
-
-    allocate(a(bsize+2,bsize+2),stat=ierr)
-    if(ierr/=0)then
-        print *,'Unsuccessful allocation!'
-        return
-    end if
-    allocate(b(bsize+2,bsize+2),stat=ierr)
-    if(ierr/=0)then
-        print *,'Unsuccessful allocation!'
-        return
-    end if
-    allocate(temp1(bsize))
-    if(ierr/=0)then
-        print *,'Unsuccessful allocation!'
-        return
-    end if
-    allocate(temp2(bsize))
-    if(ierr/=0)then
-        print *,'Unsuccessful allocation!'
-        return
-    end if
-end !subroutine ab_allocation
+!subroutine ab_allocation(a,b,bsize,ierr)
+!    implicit none
+!
+!    integer:: bsize,ierr
+!    real,allocatable:: a(:,:),b(:,:),temp1(:),temp2(:)
+!
+!    allocate(a(bsize+2,bsize+2),stat=ierr)
+!    if(ierr/=0)then
+!        print *,'Unsuccessful allocation!'
+!        return
+!    end if
+!    allocate(b(bsize+2,bsize+2),stat=ierr)
+!    if(ierr/=0)then
+!        print *,'Unsuccessful allocation!'
+!        return
+!    end if
+!    allocate(temp1(bsize))
+!    if(ierr/=0)then
+!        print *,'Unsuccessful allocation!'
+!        return
+!    end if
+!    allocate(temp2(bsize))
+!    if(ierr/=0)then
+!        print *,'Unsuccessful allocation!'
+!        return
+!    end if
+!end !subroutine ab_allocation
 
 subroutine block_neighbour(bi,bj,myid,left,right,up,down,nb)
     implicit none
@@ -153,7 +158,7 @@ subroutine block_value(bsize,a,bi,bj,nb)
     implicit none
 
     integer::bsize,bi,bj,nb
-    real,allocatable::a(:,:)
+    real::a(:,:)
 
     integer i,j
     do j=1,bsize+2
@@ -192,7 +197,7 @@ subroutine nonblock_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,
     include 'mpif.h'
 
     integer:: bi,bj,left,right,up,down,bsize,steps,nb,ierr
-    real,allocatable:: a(:,:),b(:,:),temp1(:),temp2(:)
+    real:: a(:,:),b(:,:),temp1(:),temp2(:)
 
     integer begin_col,end_col,begin_row,end_row
     integer n,i,j
