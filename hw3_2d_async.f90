@@ -15,7 +15,9 @@ real*8 time1,time2,time,gtime
 call start_mpi(myid,nproc,tsize,nb,steps,ierr)
 
 call ab_allocation(a,b,bsize,ierr)
-if (ierr/=0) then stop end if
+if (ierr/=0) then 
+    stop 
+end if
 
 bi=myid/nb
 bj=MOD(myid,nb)
@@ -44,6 +46,9 @@ end program !main
 subroutine start_mpi(myid,nproc,tsize,nb,steps,ierr)
     implicit none
     include 'mpif.h'
+
+    integer:: myid,nproc,tsize,nb,steps,ierr
+
     integer namelen
     character(len=MPI_MAX_PROCESSOR_NAME) myname
     namelist /para/ tsize,nb,steps
@@ -78,6 +83,10 @@ subroutine start_mpi(myid,nproc,tsize,nb,steps,ierr)
 end !subroutine start_mpi
 
 subroutine ab_allocation(a,b,bsize,ierr)
+    implicit none
+
+    real,allocatable:: a(:,:),b(:,:),temp1(:),temp2(:)
+
     allocate(a(bsize+2,bsize+2),stat=ierr)
     if(ierr/=0)then
         print *,'Unsuccessful allocation!'
@@ -101,6 +110,10 @@ subroutine ab_allocation(a,b,bsize,ierr)
 end !subroutine ab_allocation
 
 subroutine block_neighbour(bi,bj,myid,left,right,up,down)
+    implicit none
+
+    integer:: bj,bj,myid,left,right,up,down
+
     if (bj>0)then
     left=myid-1
     else
@@ -128,6 +141,10 @@ end !subroutine block_neighbour
 
 subroutine block_value(bsize,a,bi,bj,nb)
     implicit none
+
+    integer::bsize,bi,bj,nb
+    real,allocatable::a(:,:)
+
     integer i,j
     do j=1,bsize+2
         do i=1,bsize+2
@@ -163,6 +180,9 @@ end !subroutine block_value
 subroutine nonblock_jacobi(bi,bj,left,right,up,down,a,b,temp1,temp2,bsize,steps,nb,ierr)
     implicit none
     include 'mpif.h'
+
+    integer:: bi,bj,left,right,up,down,bsize,steps,nb,ierr
+    real,allocatable:: a(:,:),b(:,:),temp1(:),temp2(:)
 
     integer begin_col,end_col,begin_row,end_row
     integer n,i,j
