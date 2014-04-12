@@ -12,7 +12,7 @@ integer left,right,up,down
 
 real*8 time1,time2,time,gtime
 
-call start_mpi(myid,nproc,tsize,nb,steps,ierr)
+call start_mpi(myid,nproc,tsize,nb,steps,ierr,bsize)
 
 call ab_allocation(a,b,bsize,ierr)
 if (ierr/=0) then 
@@ -22,7 +22,7 @@ end if
 bi=myid/nb
 bj=MOD(myid,nb)
 
-call block_neighbour(bi,bj,myid,left,right,up,down)
+call block_neighbour(bi,bj,myid,left,right,up,down,nb)
 
 call block_value(bsize,a,bi,bj,nb)
 
@@ -43,11 +43,11 @@ call MPI_Finalize(rc)
 
 end program !main
 
-subroutine start_mpi(myid,nproc,tsize,nb,steps,ierr)
+subroutine start_mpi(myid,nproc,tsize,nb,steps,ierr,bsize)
     implicit none
     include 'mpif.h'
 
-    integer:: myid,nproc,tsize,nb,steps,ierr
+    integer:: myid,nproc,tsize,nb,steps,ierr,bsize
 
     integer namelen
     character(len=MPI_MAX_PROCESSOR_NAME) myname
@@ -85,6 +85,7 @@ end !subroutine start_mpi
 subroutine ab_allocation(a,b,bsize,ierr)
     implicit none
 
+    integer:: bsize,ierr
     real,allocatable:: a(:,:),b(:,:),temp1(:),temp2(:)
 
     allocate(a(bsize+2,bsize+2),stat=ierr)
@@ -109,10 +110,10 @@ subroutine ab_allocation(a,b,bsize,ierr)
     end if
 end !subroutine ab_allocation
 
-subroutine block_neighbour(bi,bj,myid,left,right,up,down)
+subroutine block_neighbour(bi,bj,myid,left,right,up,down,nb)
     implicit none
-
-    integer:: bj,bj,myid,left,right,up,down
+    include 'mpif.h'
+    integer:: bi,bj,myid,left,right,up,down
 
     if (bj>0)then
     left=myid-1
